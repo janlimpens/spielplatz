@@ -25,7 +25,10 @@ impl Bayes {
     }
 
     fn load_ignore_words(&mut self) {
-        for word in "i am are is a an this the".to_string().split(" ") {
+        for word in "be i am are is was were a an this the and or so much not no nor"
+            .to_string()
+            .split(" ")
+        {
             self.ignore_words.insert(word.to_string());
         }
     }
@@ -53,8 +56,9 @@ impl Bayes {
         }
     }
 
-    fn get_score(&self, word: String) -> Vec<(String, u32)> {
-        self.matrix
+    fn get_scores(&self, word: String) -> Vec<(String, u32)> {
+        let mut x: Vec<(String, u32)> = self
+            .matrix
             .keys()
             .filter(|&cat| cat.word == word)
             .map(|cat| {
@@ -62,7 +66,9 @@ impl Bayes {
                 let bucket = cat.bucket.clone();
                 (bucket, score)
             })
-            .collect()
+            .collect();
+        x.sort_by(|a, b| b.1.cmp(&a.1));
+        x
     }
 
     fn display(&self) {
@@ -70,34 +76,85 @@ impl Bayes {
             println!("Key: {}/{} Val:{}", word.word, word.bucket, score);
         }
     }
+
+    fn guess_bucket(&self, text: String) -> String {
+        if text == String::default() {
+            return text;
+        }
+        let regex = Regex::new("([a-z]*)").unwrap();
+        let matches = regex.find_iter(&text);
+        let mut bucket_score: HashMap<String, u32> = HashMap::new();
+        for token in matches {
+            let scores = self.get_scores(token.as_str().to_string());
+            for (bucket, score) in scores {
+                let entry = bucket_score.entry(bucket).or_default();
+                *entry += score;
+            }
+        }
+        let mut result: Vec<(&String, &u32)> = bucket_score.iter().collect();
+        result.sort_by(|a, b| b.cmp(&a));
+        if result.is_empty() {
+            return String::default();
+        }
+        for r in &result {
+            println!("{} with score {}", r.0, r.1);
+        }
+        result[0].0.to_owned()
+    }
 }
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-
-    fn test_learn() {
+    fn get_taught_bayes() -> Bayes {
         let learning_body = [
-            ("I am a book", "book"),
-            ("This is a book", "book"),
-            ("She reads a book", "book"),
+            ("The child wants to read a book", "book"),
+            (
+                "Reading books and magazines make for a great pass-time",
+                "book",
+            ),
+            ("Miss Darlington reads a book in the afternoon", "book"),
+            ("There is whole library full of books", "book"),
+            ("All you do is reading those filthy magazines!", "magazine"),
+            ("The child reads a classical novel", "book"),
             ("He reads a generonormative magazine", "magazine"),
             ("Magazines are great!", "magazine"),
-            ("I am another book", "book"),
-            ("I am a magazine", "magazine"),
+            ("The book was clad book in exquisit leather", "book"),
+            ("In the filthy store they sell magazines", "magazine"),
         ];
-
         let mut bayes = Bayes::new();
-
         learning_body.iter().for_each(|item| {
             bayes.learn(item.0.to_string(), item.1.to_string());
         });
+        bayes
+    }
 
+    #[test]
+    fn test_learn() {
+        let bayes = get_taught_bayes();
         bayes.display();
+        assert!(bayes.get_scores("i".to_string()).is_empty());
+        assert_eq!(bayes.get_scores("reads".to_string()).first().unwrap().1, 2);
+    }
 
-        let entry_for_i = bayes.get_score("i".to_string());
-        assert!(entry_for_i.is_empty());
+    #[test]
+    fn get_scores_returns_results_in_good_order() {
+        let bayes = get_taught_bayes();
+        let book_scores = bayes.get_scores("reads".to_string());
+        for score in &book_scores {
+            println!("Bucket: '{}' Score: {}", score.0, score.1)
+        }
+        assert_eq!(book_scores.first().unwrap().1.to_owned(), 2);
+        assert_eq!(book_scores[1].1.to_owned(), 1);
+    }
 
-        assert_eq!(bayes.get_score("reads".to_string()).first().unwrap().1, 1);
+    #[test]
+    fn get_a_good_guess() {
+        let bayes = get_taught_bayes();
+        let assumed_bucket =
+            bayes.guess_bucket("Miss so and so visits the classical library".to_string());
+        assert_eq!(assumed_bucket, "book".to_string());
+        let assumed_bucket =
+            bayes.guess_bucket("He goes to the store and reads filthy publications".to_string());
+        assert_eq!(assumed_bucket, "magazine".to_string());
     }
 }

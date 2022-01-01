@@ -1,6 +1,9 @@
 #![feature(hash_set_entry)]
+#![feature(entry_insert)]
+#[allow(dead_code)]
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
+mod r#async;
 fn main() {}
 
 struct Bayes {

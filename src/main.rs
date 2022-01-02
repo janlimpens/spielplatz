@@ -2,9 +2,11 @@
 #![feature(entry_insert)]
 #[allow(dead_code)]
 use regex::Regex;
-use std::collections::{HashMap, HashSet};
+use std::{collections::{HashMap, HashSet}, ops::ControlFlow};
 mod r#async;
-fn main() {}
+fn main() {
+    Bayes::new();
+}
 
 struct Bayes {
     matrix: HashMap<Categorization, u32>,
@@ -45,18 +47,22 @@ impl Bayes {
         let regex = Regex::new("([a-z]*)").unwrap();
         let matches = regex.find_iter(&text);
         for word in matches {
-            let value = word.as_str().to_string();
+            let word = word.as_str().to_string();
             let bucket = bucket.clone();
-            if value == String::default() || self.ignore_words.contains(&value) {
-                continue;
-            }
-            let key = Categorization {
-                word: value,
-                bucket,
-            };
-            let entry = self.matrix.entry(key).or_insert(0);
-            *entry += 1;
+            self.add_word_to_bucket(word, bucket);
         }
+    }
+
+    fn add_word_to_bucket(&mut self, word: String, bucket: String) {
+        if word == String::default() || self.ignore_words.contains(&word) {
+            return;
+        }
+        let key = Categorization {
+            word,
+            bucket,
+        };
+        let entry = self.matrix.entry(key).or_insert(0);
+        *entry += 1;
     }
 
     fn get_scores(&self, word: String) -> Vec<(String, u32)> {

@@ -1,6 +1,7 @@
 use async_std::task;
+use futures::{stream::FuturesUnordered, StreamExt};
 use rand::prelude::*;
-use std::{collections::HashMap, time::Duration};
+use std::{time::Duration};
 #[allow(dead_code)]
 
 async fn say_hello() {
@@ -13,21 +14,20 @@ async fn take_your_time(number: u32) -> (u32, u64) {
     return (number, ms);
 }
 
-async fn broker(map: &mut HashMap<u32, u64>) {
-    for n in 1..9 {
-        map.insert(n, 0);
-        let fut = take_your_time(n);
-        let (task, duration) = fut.await;
-        map.entry(task).and_modify(|e| *e = duration);
+async fn broker(map: &mut Vec<(u32, u64)>) {
+    let futures = FuturesUnordered::new();
+    for n in 0..9 {
+        futures.push(take_your_time(n));
     }
-    return;
+    let results: Vec<(u32, u64)> = futures.collect().await;
+    for r in results {
+        map.push(r);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use std::collections::HashMap;
 
     #[test]
     fn hello() {
@@ -44,10 +44,10 @@ mod tests {
     #[test]
     fn spawn_multiple() {
         println!("=== spawn_multiple ===");
-        let mut tasks = HashMap::new();
+        let mut tasks = Vec::new();
         task::block_on(broker(&mut tasks));
-        let first = tasks.get(&1).unwrap();
-        assert!(first > &0, "did not get a value on first");
+        let first = tasks.get(1).unwrap();
+        assert!(first.1 > 0, "did not get a value on first");
         for (num, dur) in tasks {
             println!("Task {} took {} ms.", num, dur);
         }

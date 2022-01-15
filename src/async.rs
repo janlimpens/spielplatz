@@ -77,4 +77,9 @@ mod tests {
     //         println!("Task {} took {} ms.", num, dur);
     //     }
     // }
+
+    #[test]
+    fn spawn_communicating_tasks() {
+
+    }
 }
